@@ -125,7 +125,7 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 // Sometimes, we connect with a slower device as the console.
 // Set your console D0/D1 baud rate here (9600 baud default)
-#define kConsoleBaud 9600
+#define kConsoleBaud 115200
 
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef ARDUINO
@@ -304,6 +304,8 @@ static unsigned char keywords[] PROGMEM = {
   'E','N','D'+0x80,
   'R','S','E','E','D'+0x80,
   'C','H','A','I','N'+0x80,
+  'O','N'+0x80,
+  'T','I','M','E','R'+0x80,
 #ifdef ENABLE_TONES
   'T','O','N','E','W'+0x80,
   'T','O','N','E'+0x80,
@@ -341,6 +343,8 @@ enum {
   KW_END,
   KW_RSEED,
   KW_CHAIN,
+  KW_ON,
+  KW_TIMER,
 #ifdef ENABLE_TONES
   KW_TONEW, KW_TONE, KW_NOTONE,
 #endif
@@ -421,6 +425,15 @@ static unsigned char highlow_tab[] PROGMEM = {
 };
 #define HIGHLOW_HIGH    1
 #define HIGHLOW_UNKNOWN 4
+
+static unsigned char onop_tab[] PROGMEM = {
+  'T','I','M','E','R'+0x80,
+  'I','N','T'+0x80,
+  0
+};
+
+#define ONOP_TIMER 1
+#define ONOP_INT 2
 
 #define STACK_SIZE (sizeof(struct stack_for_frame)*5)
 #define VAR_SIZE sizeof(short int) // Size of variables in bytes
@@ -1235,6 +1248,12 @@ interperateAtTxtpos:
 
   case KW_RSEED:
     goto rseed;
+    
+  case KW_ON:
+    goto handle_on;
+    
+  case KW_TIMER:
+    goto handle_timer;
 
 #ifdef ENABLE_TONES
   case KW_TONEW:
@@ -1711,6 +1730,67 @@ dwrite:
 #endif
 
   /*************************************************/
+handle_on:
+  goto warmstart;
+
+  /*************************************************/
+  /*  TIMER n,tcnt,presc,top                       */
+  /*  Start timer counting, presc=0 = stop         */
+  /*    top is optional and sets #bits             */
+  /*************************************************/
+handle_timer: {
+  ignore_blanks();
+  expression_error = 0;
+  uint8_t timer = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+  if (!isValidTimer(timer)) {
+    goto qhow;
+  }
+  ignore_blanks();
+  if (*txtpos != ',')
+      goto qwhat;
+  txtpos++;
+  ignore_blanks();
+  
+  uint32_t tcnt = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+  uint16_t prescale = 1;
+  uint32_t top = 0xffff;
+
+  ignore_blanks();
+  if (*txtpos != ',')
+      goto dotimer;
+  txtpos++;
+  ignore_blanks();
+  prescale = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+  ignore_blanks();
+  if (*txtpos != ',')
+      goto dotimer;
+  txtpos++;
+  ignore_blanks();
+  top = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+dotimer:
+  
+  goto warmstart;
+}
+
+  /*************************************************/
+  /*  OCR timer#,A-D,match                         */
+  /*************************************************/
+handle_ocr:
+  goto warmstart;
+  
+  /*************************************************/
 files:
   // display a listing of files on the device.
   // version 1: no support for subdirectories
@@ -1866,6 +1946,12 @@ tonegen:
     goto run_next_statement;
   }
 #endif /* ENABLE_TONES */
+}
+
+// returns 1 if the timer number passed in is valid for the current processor
+static int isValidTimer( uint8_t t )
+{
+  return t >= 0 && t < 3;
 }
 
 // returns 1 if the character is valid in a filename
