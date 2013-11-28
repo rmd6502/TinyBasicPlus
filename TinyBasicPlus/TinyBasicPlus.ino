@@ -127,6 +127,13 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 // Set your console D0/D1 baud rate here (9600 baud default)
 #define kConsoleBaud 115200
 
+// RMD: Experimental timer and interrupt features:
+// TIMER timer,tcnt,prescale
+// ON INT type GOTO|GOSUB line
+// OCR timer,register (A,B,or C),value
+#define ENABLE_TIMER_AND_IRQ 1
+//#undef ENABLE_TIMER_AND_IRQ
+
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef ARDUINO
 #ifndef RAMEND
@@ -304,8 +311,11 @@ static unsigned char keywords[] PROGMEM = {
   'E','N','D'+0x80,
   'R','S','E','E','D'+0x80,
   'C','H','A','I','N'+0x80,
+#ifdef ENABLE_TIMER_AND_IRQ
   'O','N'+0x80,
   'T','I','M','E','R'+0x80,
+  'O','C','R'+0x80,
+#endif
 #ifdef ENABLE_TONES
   'T','O','N','E','W'+0x80,
   'T','O','N','E'+0x80,
@@ -343,8 +353,11 @@ enum {
   KW_END,
   KW_RSEED,
   KW_CHAIN,
+#ifdef ENABLE_TIMER_AND_IRQ
   KW_ON,
   KW_TIMER,
+  KW_OCR,
+#endif
 #ifdef ENABLE_TONES
   KW_TONEW, KW_TONE, KW_NOTONE,
 #endif
@@ -426,14 +439,15 @@ static unsigned char highlow_tab[] PROGMEM = {
 #define HIGHLOW_HIGH    1
 #define HIGHLOW_UNKNOWN 4
 
+#ifdef ENABLE_TIMER_AND_IRQ
 static unsigned char onop_tab[] PROGMEM = {
-  'T','I','M','E','R'+0x80,
   'I','N','T'+0x80,
   0
 };
 
 #define ONOP_TIMER 1
 #define ONOP_INT 2
+#endif
 
 #define STACK_SIZE (sizeof(struct stack_for_frame)*5)
 #define VAR_SIZE sizeof(short int) // Size of variables in bytes
@@ -1249,12 +1263,16 @@ interperateAtTxtpos:
   case KW_RSEED:
     goto rseed;
     
+#ifdef ENABLE_TIMER_AND_IRQ
   case KW_ON:
     goto handle_on;
     
   case KW_TIMER:
     goto handle_timer;
-
+    
+  case KW_OCR:
+    goto handle_ocr;
+#endif
 #ifdef ENABLE_TONES
   case KW_TONEW:
     alsoWait = true;
@@ -1729,6 +1747,7 @@ dwrite:
   goto unimplemented;
 #endif
 
+#ifdef ENABLE_TIMER_AND_IRQ
   /*************************************************/
 handle_on:
   goto warmstart;
@@ -1789,7 +1808,7 @@ dotimer:
   /*************************************************/
 handle_ocr:
   goto warmstart;
-  
+#endif
   /*************************************************/
 files:
   // display a listing of files on the device.
