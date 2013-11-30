@@ -186,8 +186,17 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 // TIMER timer,tcnt,prescale
 // ON INT type GOTO|GOSUB line
 // OCR timer,register (A,B,or C),value
+// 
+// Interrupt type can be a number (vector#) or description, like
+// TIMER0_OVF
+// 
+// Of course doing this may mess with analogWrite, tone(), millis() and
+// the servo library.  Use with caution.
 #define ENABLE_TIMER_AND_IRQ 1
 //#undef ENABLE_TIMER_AND_IRQ
+
+#define ON_ERROR 1
+//#undef ON_ERROR
 
 ////////////////////////////////////////////////////////////////////////////////
 // fixes for RAMEND on some platforms
@@ -364,12 +373,12 @@ typedef short unsigned LINENUM;
 #define ECHO_CHARS 0
 #endif
 
-
 static unsigned char program[kRamSize];
 static const char *  sentinel = "HELLO";
 static unsigned char *txtpos,*list_line, *tmptxtpos;
 static unsigned char expression_error;
 static unsigned char *tempsp;
+static int32_t on_error_line = -1;
 
 /***********************************************************/
 // Keyword table and constants - the last character has 0x80 added to it
@@ -533,11 +542,67 @@ const static unsigned char highlow_tab[] PROGMEM = {
 #ifdef ENABLE_TIMER_AND_IRQ
 static unsigned char onop_tab[] PROGMEM = {
   'I','N','T'+0x80,
+  'E','R','R','O','R'+0x80,
+  0
+};
+#define ONOP_INT 1
+#define ONOP_ERROR 2
+
+static unsigned char on_g_tab[] PROGMEM = {
+  'G','O','T','O'+0x80,
+  'G','O','S','U','B'+0x80,
+  0
+};
+#define ON_GOTO 1
+#define ON_GOSUB 2
+
+enum ErrorTypes {
+  ERROR_UNIMPLEMENTED = 1,
+  ERROR_HOW,
+  ERROR_WHAT,
+  ERROR_SORRY,
+};
+
+static unsigned char interrupts_tab[] PROGMEM = {
+  'R','E','S','E','T'+0x80,
+  'I','N','T','0'+0x80,
+  'I','N','T','1'+0x80,  
+  'P','C','I','N','T','0'+0x80,
+  'P','C','I','N','T','1'+0x80,
+  'P','C','I','N','T','2'+0x80,
+  'W','D','T'+0x80,
+  'T','I','M','E','R','2','_','C','O','M','P','A'+0x80,
+  'T','I','M','E','R','2','_','C','O','M','P','B'+0x80,
+  'T','I','M','E','R','2','_','O','V','F'+0x80,
+  'T','I','M','E','R','1','_','C','A','P','T'+0x80,
+  'T','I','M','E','R','1','_','C','O','M','P','A'+0x80,
+  'T','I','M','E','R','1','_','C','O','M','P','B'+0x80,
+  'T','I','M','E','R','1','_','O','V','F'+0x80,
+  'T','I','M','E','R','0','_','C','O','M','P','A'+0x80,
+  'T','I','M','E','R','0','_','C','O','M','P','B'+0x80,
+  'T','I','M','E','R','0','_','O','V','F'+0x80,
   0
 };
 
-#define ONOP_TIMER 1
-#define ONOP_INT 2
+enum Interrupt_Vectors {
+  INT_RESET=1,
+  INT_INT0,
+  INT_INT1,
+  INT_PCINT0,
+  INT_PCINT1,
+  INT_PCINT2,
+  INT_WDT,
+  INT_TIMER2_COMPA,
+  INT_TIMER2_COMPB,
+  INT_TIMER2_OVF,
+  INT_TIMER1_CAPT,
+  INT_TIMER1_COMPA,
+  INT_TIMER1_COMPB,
+  INT_TIMER1_OVF,
+  INT_TIMER0_COMPA,
+  INT_TIMER0_COMPB,
+  INT_TIMER0_OVF,
+};
 #endif
 
 #define STACK_SIZE (sizeof(struct stack_for_frame)*5)
@@ -1243,14 +1308,38 @@ prompt:
   goto prompt;
 
 unimplemented:
+#ifdef ON_ERROR
+  if (on_error_line >= 0) {
+    current_error = ERROR_UNIMPLEMENTED;
+    linenum = on_error_line;
+    current_line = findline();
+    goto execline;
+  }
+#endif
   printmsg(unimplimentedmsg);
   goto prompt;
 
-qhow:	
+qhow:
+#ifdef ON_ERROR
+  if (on_error_line >= 0) {
+    current_error = ERROR_HOW;
+    linenum = on_error_line;
+    current_line = findline();
+    goto execline;
+  }
+#endif
   printmsg(howmsg);
   goto prompt;
 
-qwhat:	
+qwhat:
+#ifdef ON_ERROR
+  if (on_error_line >= 0) {
+    current_error = ERROR_WHAT;
+    linenum = on_error_line;
+    current_line = findline();
+    goto execline;
+  }
+#endif
   printmsgNoNL(whatmsg);
   if(current_line != NULL)
   {
@@ -1264,7 +1353,15 @@ qwhat:
   line_terminator();
   goto prompt;
 
-qsorry:	
+qsorry:
+#ifdef ON_ERROR
+  if (on_error_line >= 0) {
+    current_error = ERROR_SORRY;
+    linenum = on_error_line;
+    current_line = findline();
+    goto execline;
+  }
+#endif
   printmsg(sorrymsg);
   goto warmstart;
 
@@ -1881,13 +1978,69 @@ dwrite:
 
 #ifdef ENABLE_TIMER_AND_IRQ
   /*************************************************/
-handle_on:
+  /*   ON INT - on interrupt type
+  /*   ON ERROR - on any error
+  /*   ON expr - computed goto
+  /*      GOTO/GOSUB x[,x2,x3,...]
+  /*************************************************/
+handle_on: {
+  // Check expr first
+  expression_error = 0;
+  uint16_t compgoto = expression();
+  if (expression_error == 0) {
+    goto comp_goto_gosub;
+  }
+  scantable(onop_tab);
+  if (table_index == ONOP_INT) {
+    goto oninterrupt;
+  } else if (table_index == ONOP_ERROR) {
+    goto onerror;
+  } else {
+    goto qwhat;
+  }
+
+oninterrupt:
+  goto unimplemented;
+
+onerror:
+  goto unimplemented;
+  
+comp_goto_gosub:
+  scantable(on_g_tab);
+  if (table_index > ON_GOSUB) {
+    goto qwhat;
+  }
+  int16_t lineno = -1;
+  while (compgoto > 0) {
+    lineno = expression();
+    if (expression_error) {
+      goto qhow;
+    }
+    --compgoto;
+    if (compgoto) {
+      ignore_blanks();
+      if (*txtpos == NL) {
+        break;
+      }
+      if (*txtpos != ',')
+          goto qwhat;
+      txtpos++;
+      ignore_blanks();
+    }
+  }
+  if (compgoto == 0 && lineno >= 0) {
+    linenum = lineno;
+    current_line = findline();
+    goto execline;
+  } else {
+    goto qhow;
+  }
   goto warmstart;
+}
 
   /*************************************************/
-  /*  TIMER n,tcnt,presc,top                       */
+  /*  TIMER n,tcnt,presc                           */
   /*  Start timer counting, presc=0 = stop         */
-  /*    top is optional and sets #bits             */
   /*************************************************/
 handle_timer: {
   ignore_blanks();
@@ -1910,7 +2063,6 @@ handle_timer: {
     goto qwhat;
   }
   uint16_t prescale = 1;
-  uint32_t top = 0xffff;
 
   ignore_blanks();
   if (*txtpos != ',')
@@ -1921,18 +2073,11 @@ handle_timer: {
   if (expression_error != 0) {
     goto qwhat;
   }
-  ignore_blanks();
-  if (*txtpos != ',')
-      goto dotimer;
-  txtpos++;
-  ignore_blanks();
-  top = expression();
-  if (expression_error != 0) {
-    goto qwhat;
-  }
 dotimer:
+  setupTimer(timer, tcnt, prescale);
+
   
-  goto warmstart;
+  goto execNextLine;
 }
 
   /*************************************************/
@@ -2099,11 +2244,97 @@ tonegen:
 #endif /* ENABLE_TONES */
 }
 
+#if ENABLE_TIMER_AND_IRQ
 // returns 1 if the timer number passed in is valid for the current processor
 static int isValidTimer( uint8_t t )
 {
-  return t >= 0 && t < 3;
+  switch(t) {
+#ifdef TCNT0
+  case 0:
+#endif
+#ifdef TCNT1
+  case 1:
+#endif
+#ifdef TCNT2
+  case 2:
+#endif
+#ifdef TCNT3
+  case 3:
+#endif
+#ifdef TCNT4
+  case 4:
+#endif
+#ifdef TCNT5
+  case 5:
+#endif
+    return 1;
+    default:
+    return 0;
+  }
 }
+
+static uint16_t tcntMap[] PROGMEM = { (uint16_t)&TCNT0, (uint16_t)&TCNT1,
+#ifdef TCNT2
+(uint16_t)&TCNT2,
+#else
+0,
+#endif
+#ifdef TCNT3
+(uint16_t)&TCNT3,
+#else
+0,
+#endif
+#ifdef TCNT4
+(uint16_t)&TCNT4,
+#else
+0,
+#endif
+};
+
+static volatile uint8_t *tccrMap[] PROGMEM = { &TCCR0A, &TCCR1A,
+#ifdef TCNT2
+&TCCR2A,
+#else
+0,
+#endif
+#ifdef TCNT3
+&TCCR3A,
+#else
+0,
+#endif
+#ifdef TCNT4
+&TCCR4A,
+#else
+0,
+#endif
+};
+
+static uint8_t timerBits[] PROGMEM = {
+  8,16,
+#ifdef TCNT2
+  8,
+#else
+  0,
+#endif
+#ifdef TCNT3
+  16,10,
+#else
+  0,
+#endif
+};
+
+static void setupTimer(uint8_t timerNumber, uint16_t initialCount, uint8_t prescale)
+{
+  if (pgm_read_byte(&timerBits[timerNumber]) > 8) {
+    _MMIO_WORD(pgm_read_word(&tcntMap[timerNumber])) = initialCount;
+  } else {
+    _MMIO_BYTE(pgm_read_word(&tcntMap[timerNumber])) = initialCount;
+  }
+  uint16_t tccrb = pgm_read_word(&tccrMap[timerNumber])+1;
+  uint8_t mask = ((timerNumber == 4) ? 0xf : 7);
+  _MMIO_BYTE(tccrb) = (_MMIO_BYTE(tccrb) & ~mask) | prescale;
+}
+#endif
 
 // returns 1 if the character is valid in a filename
 static int isValidFnChar( char c )
