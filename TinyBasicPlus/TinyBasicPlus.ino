@@ -288,6 +288,7 @@ static unsigned char *txtpos,*list_line;
 static unsigned char expression_error;
 static unsigned char *tempsp;
 static int32_t on_error_line = -1;
+static uint8_t current_error = 0;
 
 /***********************************************************/
 // Keyword table and constants - the last character has 0x80 added to it
@@ -399,6 +400,7 @@ static unsigned char func_tab[] PROGMEM = {
   'A','R','E','A','D'+0x80,
   'D','R','E','A','D'+0x80,
   'R','N','D'+0x80,
+  'E','R','R'+0x80,
   0
 };
 #define FUNC_PEEK    0
@@ -406,7 +408,12 @@ static unsigned char func_tab[] PROGMEM = {
 #define FUNC_AREAD   2
 #define FUNC_DREAD   3
 #define FUNC_RND     4
+#ifdef ON_ERROR
+#define FUNC_ERR     5
+#define FUNC_UNKNOWN 6
+#else
 #define FUNC_UNKNOWN 5
+#endif
 
 static unsigned char to_tab[] PROGMEM = {
   'T','O'+0x80,
@@ -903,6 +910,10 @@ static short int expr4(void)
       return( random( a ));
 #else
       return( rand() % a );
+#endif
+#ifdef ON_ERROR
+    case FUNC_ERR:
+      return current_error;
 #endif
     }
   }
@@ -1870,9 +1881,18 @@ handle_on: {
 oninterrupt:
   goto unimplemented;
 
-onerror:
-  goto unimplemented;
-  
+#ifdef ON_ERROR
+onerror: {
+  expression_error = 0;
+  uint16_t errorline = expression();
+  if (expression_error) {
+    goto qhow;
+  }
+  on_error_line = errorline;
+  goto execnextline;
+}
+#endif
+
 comp_goto_gosub:
   scantable(on_g_tab);
   if (table_index > ON_GOSUB) {
@@ -1945,7 +1965,7 @@ dotimer:
   setupTimer(timer, tcnt, prescale);
 
   
-  goto execNextLine;
+  goto execnextline;
 }
 
   /*************************************************/
