@@ -105,8 +105,8 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 // this is the alternate autorun.  Autorun the program in the eeprom.
 // it will load whatever is in the EEProm and run it
-#define ENABLE_EAUTORUN 1
-//#undef ENABLE_EAUTORUN
+//#define ENABLE_EAUTORUN 1
+#undef ENABLE_EAUTORUN
 
 // this will enable the "TONE", "NOTONE" command using a piezo
 // element on the specified pin.  Wire the red/positive/piezo to the kPiezoPin,
@@ -142,6 +142,9 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 #define ON_ERROR 1
 //#undef ON_ERROR
+
+static unsigned char table_index_msg[] PROGMEM = "Table Index: ";
+static unsigned char expr_parse_msg[] PROGMEM = "Expression error: ";
 
 ////////////////////////////////////////////////////////////////////////////////
 #ifdef ARDUINO
@@ -400,7 +403,9 @@ static unsigned char func_tab[] PROGMEM = {
   'A','R','E','A','D'+0x80,
   'D','R','E','A','D'+0x80,
   'R','N','D'+0x80,
-  'E','R','R'+0x80,
+#ifdef ON_ERROR
+  'E','R','R','C','O','D','E'+0x80,
+#endif
   0
 };
 #define FUNC_PEEK    0
@@ -461,16 +466,16 @@ static unsigned char onop_tab[] PROGMEM = {
   'E','R','R','O','R'+0x80,
   0
 };
-#define ONOP_INT 1
-#define ONOP_ERROR 2
+#define ONOP_INT 0
+#define ONOP_ERROR 1
 
 static unsigned char on_g_tab[] PROGMEM = {
   'G','O','T','O'+0x80,
   'G','O','S','U','B'+0x80,
   0
 };
-#define ON_GOTO 1
-#define ON_GOSUB 2
+#define ON_GOTO 0
+#define ON_GOSUB 1
 
 enum ErrorTypes {
   ERROR_UNIMPLEMENTED = 1,
@@ -1076,6 +1081,7 @@ void loop()
 warmstart:
   // this signifies that it is running in 'direct' mode.
   current_line = 0;
+  on_error_line = -1;
   sp = program+sizeof(program);
   printmsg(okmsg);
 
@@ -1213,6 +1219,7 @@ unimplemented:
 qhow:
 #ifdef ON_ERROR
   if (on_error_line >= 0) {
+    //Serial.print("how on_error_line "); Serial.println(on_error_line);
     current_error = ERROR_HOW;
     linenum = on_error_line;
     current_line = findline();
@@ -1225,6 +1232,7 @@ qhow:
 qwhat:
 #ifdef ON_ERROR
   if (on_error_line >= 0) {
+    //Serial.print("what on_error_line "); Serial.println(on_error_line);
     current_error = ERROR_WHAT;
     linenum = on_error_line;
     current_line = findline();
@@ -1872,8 +1880,10 @@ handle_on: {
   scantable(onop_tab);
   if (table_index == ONOP_INT) {
     goto oninterrupt;
+#ifdef ON_ERROR
   } else if (table_index == ONOP_ERROR) {
     goto onerror;
+#endif
   } else {
     goto qwhat;
   }
@@ -1883,13 +1893,14 @@ oninterrupt:
 
 #ifdef ON_ERROR
 onerror: {
+  scantable(on_g_tab);
   expression_error = 0;
   uint16_t errorline = expression();
   if (expression_error) {
     goto qhow;
   }
   on_error_line = errorline;
-  goto execnextline;
+  goto run_next_statement;
 }
 #endif
 
