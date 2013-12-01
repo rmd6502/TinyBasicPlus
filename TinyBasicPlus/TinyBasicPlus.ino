@@ -160,8 +160,8 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 // this is the alternate autorun.  Autorun the program in the eeprom.
 // it will load whatever is in the EEProm and run it
-//#define ENABLE_EAUTORUN 1
-#undef ENABLE_EAUTORUN
+#define ENABLE_EAUTORUN 1
+//#undef ENABLE_EAUTORUN
 
 // this will enable the "TONE", "NOTONE" command using a piezo
 // element on the specified pin.  Wire the red/positive/piezo to the kPiezoPin,
@@ -195,11 +195,21 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 #define ENABLE_TIMER_AND_IRQ 1
 //#undef ENABLE_TIMER_AND_IRQ
 
+// RMD: ON ERROR, computed goto
+// Computed goto is rather silly, since we can say goto 4*10 already
 #define ON_ERROR 1
 //#undef ON_ERROR
 
-static unsigned char table_index_msg[] PROGMEM = "Table Index: ";
-static unsigned char expr_parse_msg[] PROGMEM = "Expression error: ";
+#ifdef ON_ERROR
+#define check_error(errno)     \
+if (on_error_line >= 0) {      \
+    current_error = errno;     \
+    linenum = on_error_line;   \
+    current_line = findline(); \
+    on_error_line = -1;        \
+    goto execline;             \
+  }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // fixes for RAMEND on some platforms
@@ -1183,11 +1193,11 @@ void loop()
 warmstart:
   // this signifies that it is running in 'direct' mode.
   current_line = 0;
-  on_error_line = -1;
   sp = program+sizeof(program);
   printmsg(okmsg);
 
 prompt:
+  on_error_line = -1;
   if( triggerRun ){
     triggerRun = false;
     current_line = program_start;
@@ -1326,38 +1336,21 @@ prompt:
 
 unimplemented:
 #ifdef ON_ERROR
-  if (on_error_line >= 0) {
-    current_error = ERROR_UNIMPLEMENTED;
-    linenum = on_error_line;
-    current_line = findline();
-    goto execline;
-  }
+    check_error(ERROR_UNIMPLEMENTED);
 #endif
   printmsg(unimplimentedmsg);
   goto prompt;
 
 qhow:
 #ifdef ON_ERROR
-  if (on_error_line >= 0) {
-    //Serial.print("how on_error_line "); Serial.println(on_error_line);
-    current_error = ERROR_HOW;
-    linenum = on_error_line;
-    current_line = findline();
-    goto execline;
-  }
+    check_error(ERROR_HOW);
 #endif
   printmsg(howmsg);
   goto prompt;
 
 qwhat:
 #ifdef ON_ERROR
-  if (on_error_line >= 0) {
-    //Serial.print("what on_error_line "); Serial.println(on_error_line);
-    current_error = ERROR_WHAT;
-    linenum = on_error_line;
-    current_line = findline();
-    goto execline;
-  }
+  check_error(ERROR_WHAT);
 #endif
   printmsgNoNL(whatmsg);
   if(current_line != NULL)
@@ -1374,12 +1367,7 @@ qwhat:
 
 qsorry:
 #ifdef ON_ERROR
-  if (on_error_line >= 0) {
-    current_error = ERROR_SORRY;
-    linenum = on_error_line;
-    current_line = findline();
-    goto execline;
-  }
+  check_error(ERROR_SORRY);
 #endif
   printmsg(sorrymsg);
   goto warmstart;
@@ -2108,14 +2096,14 @@ dotimer:
   setupTimer(timer, tcnt, prescale);
 
   
-  goto execnextline;
+  goto run_next_statement;
 }
 
   /*************************************************/
   /*  OCR timer#,A-D,match                         */
   /*************************************************/
 handle_ocr:
-  goto warmstart;
+  goto unimplemented;
 #endif
   /*************************************************/
 files:
