@@ -105,8 +105,8 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 // this is the alternate autorun.  Autorun the program in the eeprom.
 // it will load whatever is in the EEProm and run it
-#define ENABLE_EAUTORUN 1
-//#undef ENABLE_EAUTORUN
+//#define ENABLE_EAUTORUN 1
+#undef ENABLE_EAUTORUN
 
 // this will enable the "TONE", "NOTONE" command using a piezo
 // element on the specified pin.  Wire the red/positive/piezo to the kPiezoPin,
@@ -148,12 +148,13 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 #ifdef ON_ERROR
 #define check_error(errno)     \
 if (on_error_line >= 0) {      \
+    linenum = on_error_line;   \
     on_error_line = -1;        \
     current_error = errno;     \
-    linenum = on_error_line;   \
     if (on_error_type == ON_GOSUB) {  \
+      current_line +=	 current_line[sizeof(LINENUM)]; \
       goto ongosub;                   \
-    }                                 \
+    }                             \
     current_line = findline(); \
     goto execline;             \
   }
