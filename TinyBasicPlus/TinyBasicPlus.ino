@@ -148,10 +148,13 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 #ifdef ON_ERROR
 #define check_error(errno)     \
 if (on_error_line >= 0) {      \
+    on_error_line = -1;        \
     current_error = errno;     \
     linenum = on_error_line;   \
+    if (on_error_type == ON_GOSUB) {  \
+      goto ongosub;                   \
+    }                                 \
     current_line = findline(); \
-    on_error_line = -1;        \
     goto execline;             \
   }
 #endif
@@ -301,6 +304,7 @@ static unsigned char *txtpos,*list_line;
 static unsigned char expression_error;
 static unsigned char *tempsp;
 static int32_t on_error_line = -1;
+static uint8_t on_error_type = 0;
 static uint8_t current_error = 0;
 
 /***********************************************************/
@@ -1567,22 +1571,24 @@ forloop:
 gosub:
   expression_error = 0;
   linenum = expression();
-  if(!expression_error && *txtpos == NL)
-  {
-    struct stack_gosub_frame *f;
-    if(sp + sizeof(struct stack_gosub_frame) < stack_limit)
-      goto qsorry;
-
-    sp -= sizeof(struct stack_gosub_frame);
-    f = (struct stack_gosub_frame *)sp;
-    f->frame_type = STACK_GOSUB_FLAG;
-    f->txtpos = txtpos;
-    f->current_line = current_line;
-    current_line = findline();
-    goto execline;
+  if(!expression_error && *txtpos == NL) {
+    goto ongosub;
   }
   goto qhow;
-
+  
+ongosub:
+  struct stack_gosub_frame *f;
+  if(sp + sizeof(struct stack_gosub_frame) < stack_limit)
+    goto qsorry;
+  
+  sp -= sizeof(struct stack_gosub_frame);
+  f = (struct stack_gosub_frame *)sp;
+  f->frame_type = STACK_GOSUB_FLAG;
+  f->txtpos = txtpos;
+  f->current_line = current_line;
+  current_line = findline();
+  goto execline;
+    
 next:
   // Fnd the variable name
   ignore_blanks();
@@ -1882,6 +1888,7 @@ oninterrupt:
 #ifdef ON_ERROR
 onerror: {
   scantable(on_g_tab);
+  on_error_type = table_index;
   expression_error = 0;
   uint16_t errorline = expression();
   if (expression_error) {
@@ -1915,7 +1922,7 @@ comp_goto_gosub:
       ignore_blanks();
     }
   }
-  if (compgoto == 0 && lineno >= 0) {
+  if (compgoto == 0 && lineno > 0) {
     linenum = lineno;
     current_line = findline();
     goto execline;
@@ -1970,8 +1977,33 @@ dotimer:
   /*************************************************/
   /*  OCR timer#,A-D,match                         */
   /*************************************************/
-handle_ocr:
-  goto unimplemented;
+handle_ocr: {
+  uint8_t timer = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+  if (!isValidTimer(timer)) {
+    goto qhow;
+  }
+  ignore_blanks();
+  if (*txtpos != ',')
+      goto qwhat;
+  txtpos++;
+  ignore_blanks();
+  
+  char ocrNo = *txtpos++;
+  if (ocrNo < 'A' || ocrNo > 'D') {
+   goto qhow;
+  }
+ ocrNo -= 'A'; 
+  uint32_t matchVal = expression();
+  if (expression_error != 0) {
+    goto qwhat;
+  }
+  setupOCR(timer,ocrNo,matchVal);
+  goto run_next_statement;
+}
+
 #endif
   /*************************************************/
 files:
@@ -2196,6 +2228,24 @@ static volatile uint8_t *tccrMap[] PROGMEM = { &TCCR0A, &TCCR1A,
 #endif
 };
 
+static uint16_t ocrMap[] PROGMEM = { (uint16_t)&OCR0A, (uint16_t)&OCR1A,
+#ifdef TCNT2
+(uint16_t)&)CR2A,
+#else
+0,
+#endif
+#ifdef TCNT3
+(uint16_t)&OCR3A,
+#else
+0,
+#endif
+#ifdef TCNT4
+(uint16_t)&OCR4A,
+#else
+0,
+#endif
+};
+
 static uint8_t timerBits[] PROGMEM = {
   8,16,
 #ifdef TCNT2
@@ -2220,6 +2270,15 @@ static void setupTimer(uint8_t timerNumber, uint16_t initialCount, uint8_t presc
   uint16_t tccrb = pgm_read_word(&tccrMap[timerNumber])+1;
   uint8_t mask = ((timerNumber == 4) ? 0xf : 7);
   _MMIO_BYTE(tccrb) = (_MMIO_BYTE(tccrb) & ~mask) | prescale;
+}
+
+static void setupOCR(uint8_t timerNumber, uint8_t ocrNumber, uint16_t matchValue)
+{
+  if (pgm_read_byte(&timerBits[timerNumber]) > 8) {
+    _MMIO_WORD(pgm_read_word(&ocrMap[timerNumber])+ocrNumber) = matchValue;
+  } else {
+    _MMIO_BYTE(pgm_read_word(&ocrMap[timerNumber])+ocrNumber) = matchValue;
+  }
 }
 #endif
 
