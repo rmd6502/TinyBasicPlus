@@ -2,7 +2,7 @@
 // TinyBasic Plus
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Authors: 
+// Authors:
 //    Gordon Brandly (Tiny Basic for 68000)
 //    Mike Field <hamster@snap.net.nz> (Arduino Basic) (port to Arduino)
 //    Scott Lawrence <yorgle@gmail.com> (TinyBasic Plus) (features, etc)
@@ -15,7 +15,7 @@
 //    https://en.wikipedia.org/wiki/Tiny_BASIC
 
 // LICENSING NOTES:
-//    Mike Field based his C port of Tiny Basic on the 68000 
+//    Mike Field based his C port of Tiny Basic on the 68000
 //    Tiny BASIC which carried the following license:
 /*
 ******************************************************************
@@ -41,7 +41,7 @@
 //    ref: http://members.shaw.ca:80/gbrandly/68ktinyb.html
 //
 //    However, Mike did not include a license of his own for his
-//    version of this.  
+//    version of this.
 //    ref: http://hamsterworks.co.nz/mediawiki/index.php/Arduino_Basic
 //
 //    From discussions with him, I felt that the MIT license is
@@ -118,7 +118,7 @@
 //	Integrated Jurg Wullschleger whitespace,unary fix
 //	Now available through github
 //	Project renamed from "Tiny Basic in C" to "TinyBasic Plus"
-//	   
+//
 // v0.02b: 2012-09-17  Scott Lawrence <yorgle@gmail.com>
 // 	Better FILES listings
 //
@@ -135,7 +135,7 @@
 char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 
 // hack to let makefiles work with this file unchanged
-#ifdef FORCE_DESKTOP 
+#ifdef FORCE_DESKTOP
 #undef ARDUINO
 #include "desktop.h"
 #else
@@ -171,7 +171,7 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 #undef ENABLE_TONES
 #define kPiezoPin 5
 
-// we can use the EEProm to store a program during powerdown.  This is 
+// we can use the EEProm to store a program during powerdown.  This is
 // 1kbyte on the '328, and 512 bytes on the '168.  Enabling this here will
 // allow for this funcitonality to work.  Note that this only works on AVR
 // arduino.  Disable it for DUE/other devices.
@@ -253,7 +253,7 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
     #define kRamTones (0)
   #endif
 
-  #define kRamSize  (RAMEND - 1160 - kRamFileIO - kRamTones) 
+  #define kRamSize  (RAMEND - 1160 - kRamFileIO - kRamTones)
 
 #endif /* ARDUINO Specifics */
 
@@ -293,7 +293,7 @@ char eliminateCompileErrors = 1;  // fix to suppress arduino build errors
 ////////////////////
 // various other desktop-tweaks and such.
 
-#ifndef boolean 
+#ifndef boolean
   #define boolean int
   #define true 1
   #define false 0
@@ -413,7 +413,7 @@ const static unsigned char keywords[] PROGMEM = {
   0
 };
 
-// by moving the command list to an enum, we can easily remove sections 
+// by moving the command list to an enum, we can easily remove sections
 // above and below simultaneously to selectively obliterate functionality.
 enum {
   KW_LIST = 0,
@@ -438,7 +438,7 @@ enum {
 #endif
 #ifdef ARDUINO
 #ifdef ENABLE_EEPROM
-  KW_ECHAIN, KW_ELIST, KW_ELOAD, KW_EFORMAT, KW_ESAVE, 
+  KW_ECHAIN, KW_ELIST, KW_ELOAD, KW_EFORMAT, KW_ESAVE,
 #endif
 #endif
   KW_DEFAULT /* always the final one*/
@@ -504,7 +504,7 @@ const static unsigned char relop_tab[] PROGMEM = {
 #define RELOP_NE_BANG		6
 #define RELOP_UNKNOWN	7
 
-const static unsigned char highlow_tab[] PROGMEM = { 
+const static unsigned char highlow_tab[] PROGMEM = {
   'H','I','G','H'+0x80,
   'H','I'+0x80,
   'L','O','W'+0x80,
@@ -852,7 +852,7 @@ static short int expr4(void)
     do 	{
       a = a*10 + *txtpos - '0';
       txtpos++;
-    } 
+    }
     while(*txtpos >= '0' && *txtpos <= '9');
     return a;
   }
@@ -888,16 +888,16 @@ static short int expr4(void)
     {
     case FUNC_PEEK:
       return program[a];
-      
+
     case FUNC_ABS:
-      if(a < 0) 
+      if(a < 0)
         return -a;
       return a;
 
 #ifdef ARDUINO
     case FUNC_AREAD:
       pinMode( a, INPUT );
-      return analogRead( a );                        
+      return analogRead( a );
     case FUNC_DREAD:
       pinMode( a, INPUT );
       return digitalRead( a );
@@ -1169,7 +1169,7 @@ prompt:
       from++;
       dest++;
       tomove--;
-    }	
+    }
     program_end = dest;
   }
 
@@ -1180,7 +1180,7 @@ prompt:
 
   // Make room for the new line, either all in one hit or lots of little shuffles
   while(linelen > 0)
-  {	
+  {
     unsigned int tomove;
     unsigned char *from,*dest;
     unsigned int space_to_make;
@@ -1220,11 +1220,11 @@ unimplemented:
   printmsg(unimplimentedmsg);
   goto prompt;
 
-qhow:	
+qhow:
   printmsg(howmsg);
   goto prompt;
 
-qwhat:	
+qwhat:
   printmsgNoNL(whatmsg);
   if(current_line != NULL)
   {
@@ -1238,7 +1238,7 @@ qwhat:
   line_terminator();
   goto prompt;
 
-qsorry:	
+qsorry:
   printmsg(sorrymsg);
   goto warmstart;
 
@@ -1250,7 +1250,7 @@ run_next_statement:
     goto execnextline;
   goto interperateAtTxtpos;
 
-direct: 
+direct:
   txtpos = program_end+sizeof(LINENUM);
   if(*txtpos == NL)
     goto prompt;
@@ -1323,14 +1323,14 @@ interperateAtTxtpos:
   case KW_GOSUB:
     goto gosub;
   case KW_RETURN:
-    goto gosub_return; 
+    goto gosub_return;
   case KW_REM:
   case KW_QUOTE:
     goto execnextline;	// Ignore line completely
   case KW_FOR:
-    goto forloop; 
+    goto forloop;
   case KW_INPUT:
-    goto input; 
+    goto input;
   case KW_PRINT:
   case KW_QMARK:
     goto print;
@@ -1413,7 +1413,7 @@ elist:
 
       if( ((val < ' ') || (val  > '~')) && (val != NL) && (val != CR))  {
         outchar( '?' );
-      } 
+      }
       else {
         outchar( val );
       }
@@ -1446,11 +1446,11 @@ esave:
 
     // go back to standard output, close the file
     outStream = kStreamSerial;
-    
+
     goto warmstart;
   }
-  
-  
+
+
 echain:
   runAfterLoad = true;
 
@@ -1612,7 +1612,7 @@ gosub_return:
         // Is the the variable we are looking for?
         if(txtpos[-1] == f->for_var)
         {
-          short int *varaddr = ((short int *)variables_begin) + txtpos[-1] - 'A'; 
+          short int *varaddr = ((short int *)variables_begin) + txtpos[-1] - 'A';
           *varaddr = *varaddr + f->step;
           // Use a different test depending on the sign of the step increment
           if((f->step > 0 && *varaddr <= f->terminal) || (f->step < 0 && *varaddr >= f->terminal))
@@ -1754,7 +1754,7 @@ print:
       break;
     }
     else
-      goto qwhat;	
+      goto qwhat;
   }
   goto run_next_statement;
 
@@ -1768,15 +1768,15 @@ mem:
     // eprom size
     printnum( E2END+1 );
     printmsg( eeprommsg );
-    
+
     // figure out the memory usage;
     val = ' ';
-    int i;   
+    int i;
     for( i=0 ; (i<(E2END+1)) && (val != '\0') ; i++ ) {
-      val = EEPROM.read( i );    
+      val = EEPROM.read( i );
     }
     printnum( (E2END +1) - (i-1) );
-    
+
     printmsg( eepromamsg );
   }
 #endif /* ENABLE_EEPROM */
@@ -1808,17 +1808,17 @@ dwrite:
     ignore_blanks();
 
 
-    txtposBak = txtpos; 
+    txtposBak = txtpos;
     scantable(highlow_tab);
     if(table_index != HIGHLOW_UNKNOWN)
     {
       if( table_index <= HIGHLOW_HIGH ) {
         value = 1;
-      } 
+      }
       else {
         value = 0;
       }
-    } 
+    }
     else {
 
       // and the value (numerical)
@@ -1830,7 +1830,7 @@ dwrite:
     pinMode( pinNo, OUTPUT );
     if( isDigital ) {
       digitalWrite( pinNo, value );
-    } 
+    }
     else {
       analogWrite( pinNo, value );
     }
@@ -1879,7 +1879,7 @@ load:
     if( !SD.exists( (char *)filename ))
     {
       printmsg( sdfilemsg );
-    } 
+    }
     else {
 
       fp = SD.open( (const char *)filename );
@@ -2057,13 +2057,13 @@ void setup()
 #ifdef ARDUINO
   Serial.begin(kConsoleBaud);	// opens serial port
   while( !Serial ); // for Leonardo
-  
+
   Serial.println( sentinel );
   printmsg(initmsg);
 
 #ifdef ENABLE_FILEIO
   initSD();
-  
+
 #ifdef ENABLE_AUTORUN
   if( SD.exists( kAutorunFilename )) {
     program_end = program_start;
@@ -2115,7 +2115,7 @@ static int inchar()
 {
   int v;
 #ifdef ARDUINO
-  
+
   switch( inStream ) {
   case( kStreamFile ):
 #ifdef ENABLE_FILEIO
@@ -2125,7 +2125,7 @@ static int inchar()
       fp.close();
       goto inchar_loadfinish;
     }
-    return v;    
+    return v;
 #else
 #endif
      break;
@@ -2151,7 +2151,7 @@ static int inchar()
         return Serial.read();
     }
   }
-  
+
 inchar_loadfinish:
   inStream = kStreamSerial;
   inhibitOutput = false;
@@ -2161,7 +2161,7 @@ inchar_loadfinish:
     triggerRun = true;
   }
   return NL; // trigger a prompt.
-  
+
 #else
   // otherwise. desktop!
   int got = getchar();
@@ -2183,7 +2183,7 @@ static void outchar(unsigned char c)
     if( outStream == kStreamFile ) {
       // output to a file
       fp.write( c );
-    } 
+    }
     else
   #endif
   #ifdef ARDUINO
@@ -2191,7 +2191,7 @@ static void outchar(unsigned char c)
     if( outStream == kStreamEEProm ) {
       EEPROM.write( eepos++, c );
     }
-    else 
+    else
   #endif /* ENABLE_EEPROM */
   #endif /* ARDUINO */
     Serial.write(c);
@@ -2209,12 +2209,12 @@ static void outchar(unsigned char c)
 static int initSD( void )
 {
   // if the card is already initialized, we just go with it.
-  // there is no support (yet?) for hot-swap of SD Cards. if you need to 
+  // there is no support (yet?) for hot-swap of SD Cards. if you need to
   // swap, pop the card, reset the arduino.)
 
   if( sd_is_initialized == true ) return kSD_OK;
 
-  // due to the way the SD Library works, pin 10 always needs to be 
+  // due to the way the SD Library works, pin 10 always needs to be
   // an output, even when your shield uses another line for CS
   pinMode(10, OUTPUT); // change this to 53 on a mega
 
