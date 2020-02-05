@@ -11,7 +11,8 @@ TinyBasic Plus is an extension and modification upon the original
 "Tiny Basic" by adding support for a few more devices, configurable
 at build time.  It is designed for use on the Arduino, although
 builds will soon be easily possible for other platforms through
-command line makefiles.
+command line makefiles.  Provided is a makefile that builds for 
+unix-ey type OSes.  It has only been tested for Darwin (OS X).
 
 Features added include support for fileio (SD Library), autorunning
 a program from the SD card, smaller footprint (PROGMEM), support
@@ -41,8 +42,9 @@ program.
 - ECHAIN	- load the program from EEProm and run it
 
 ## IO, Documentation
-- PEEK( address )	- *set a value in memory* (unimplemented)
-- POKE			- *get a value in memory* (unimplemented)
+- INPUT variable	- *let the user input an expression (number or variable name*
+- PEEK( address )	- *get a value in memory* (unimplemented)
+- POKE address		- *set a value in memory* (unimplemented)
 - PRINT expression	- *print out the expression, also "?"*
 - REM stuff		- *remark/comment, also "'"*
 
@@ -83,6 +85,19 @@ NOTE: TONE commands are by default disabled
 # Example programs
 
 Here are a few example programs to get you started...
+
+## User Input
+
+Let a user enter a new value for a variable, enter a number like '33' or '42',
+or a varaible like 'b'.
+
+	10 A=0
+	15 B=999
+	20 PRINT "A is ", A
+	30 PRINT "Enter a new value ";
+	40 INPUT A
+	50 PRINT "A is now ", A
+
 
 ## Blink
 
@@ -175,14 +190,50 @@ List both, and run
 
 # Authors and Contributors
 
-- Tiny Basic 68k - Gordon Brandly [Project Page](http://members.shaw.ca/gbrandly/68ktinyb.html)
-- Arduino Basic / Tiny Basic C - Michael Field [Project Page](http://ec2-122-248-210-243.ap-southeast-1.compute.amazonaws.com/mediawiki/index.php/Arduino_Basic)
-- Tiny Basic Plus - Scott Lawrence <yorgle@gmail.com> [Github Page](http://github.com/BleuLlama/TinyBasicPlus]
+- Tiny Basic 68k - Gordon Brandly [Project Page (via archive.org)](https://web.archive.org/web/20170306113457/http://members.shaw.ca:80/gbrandly/68ktinyb.html)
+- Arduino Basic / Tiny Basic C - Michael Field [Project Page](http://hamsterworks.co.nz/mediawiki/index.php/Arduino_Basic)
+- Tiny Basic Plus - Scott Lawrence <yorgle@gmail.com> [Github Page](http://github.com/BleuLlama/TinyBasicPlus)
 
 - Jurg Wullschleger - Fix for unary operations and whitespace in expressions
 
 # Links
 - [Arduino Microcontroller](http://arduino.cc)
+
+# Licensing
+
+Mike Field based his C port of Tiny Basic on the 68000 Tiny BASIC which carried 
+the following license:
+
+~~~
+******************************************************************
+*                                                                *
+*               Tiny BASIC for the Motorola MC68000              *
+*                                                                *
+* Derived from Palo Alto Tiny BASIC as published in the May 1976 *
+* issue of Dr. Dobb's Journal.  Adapted to the 68000 by:         *
+*       Gordon Brandly                                           *
+*       12147 - 51 Street                                        *
+*       Edmonton AB  T5W 3G8                                     *
+*       Canada                                                   *
+*       (updated mailing address for 1996)                       *
+*                                                                *
+* This version is for MEX68KECB Educational Computer Board I/O.  *
+*                                                                *
+******************************************************************
+*    Copyright (C) 1984 by Gordon Brandly. This program may be   *
+*    freely distributed for personal use only. All commercial    *
+*                      rights are reserved.                      *
+******************************************************************
+~~~
+
+However, Mike did not include a license of his own for his
+ version of this. From discussions with him, I felt that the MIT license is
+the most applicable to his intent.
+
+I am in the process of further determining what should be done wrt licensing 
+further.  This entire header will likely change with the next version 0.16, 
+which will hopefully nail down the whole thing so we can get back to 
+implementing features instead of licenses.  Thank you for your time.
 
 # MIT License
 

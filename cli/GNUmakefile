@@ -29,11 +29,11 @@ endif
 
 ifeq ($(ARCH),MINGW)
 export EXEEXT := .exe
-3lse
+else
 export EXEEXT := 
 endif
 
-export CXXFLAGS += -DFORCE_DESKTOP
+export CXXFLAGS += -DFORCE_DESKTOP -Wno-int-to-pointer-cast
 
 export CXX := g++
 export CC  := gcc
@@ -53,9 +53,9 @@ $(PROG): TinyBasicPlus.o main.o
 	@$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) $(LIBS) -o $@
 
 
-TinyBasicPlus.cpp: ../Arduino/TinyBasicPlus.ino
-	@echo copy $< to $@
-	@cp $< $@
+TinyBasicPlus.cpp: ../TinyBasicPlus/TinyBasicPlus.ino
+	@echo Linking .cpp file to the Arduino .ino source
+	@ln -s $< $@
 
 %.o: %.cpp
 	@echo compile $<
@@ -65,3 +65,7 @@ clean:
 	@echo removing generated files
 	@-rm -f $(OBJS) $(PROG) TinyBasicPlus.cpp
 .PHONY: clean
+
+test: $(PROG)
+	./$(PROG)
+.PHONY: test
